@@ -1,0 +1,625 @@
+# Text UI (TUI) Best Practices
+
+Legend (from RFC2119): !=MUST, ~=SHOULD, ≉=SHOULD NOT, ⊗=MUST NOT
+
+**⚠️ See also**: [cli.md](./cli.md) | [python.md](./python.md) | [typescript.md](./typescript.md)
+
+## 🎯 Framework Selection
+
+### Python TUIs
+! Use Textual (https://textual.textualize.io/) for new TUI projects
+- Modern, reactive framework with CSS-like styling
+- Async-first with proper concurrency primitives
+- Rich widget ecosystem with extensibility
+- Active development and excellent documentation
+- Battle-tested in production applications
+
+### TypeScript/Node.js TUIs
+! Use ink (https://term.ink/) for new TUI projects
+- React-based component model (closest to Textual's approach)
+- Declarative UI composition with hooks
+- Large ecosystem of components
+- Excellent TypeScript support
+- Similar reactive patterns to Textual
+
+**Exceptions**:
+- Existing codebases may continue using `blessed` or `terminal-kit`
+- Legacy compatibility requirements may justify `blessed`
+- Low-level terminal manipulation may use `terminal-kit`
+
+## 📐 Architecture Patterns (Textual)
+
+### 1. Application Structure
+
+```python
+from textual.app import App, ComposeResult
+from textual.widgets import Header, Footer
+
+class MyApp(App[None]):
+    """Main application class.
+    
+    Attributes:
+        TITLE: Window title
+        CSS: Application-wide CSS styling
+        BINDINGS: Global keyboard shortcuts
+    """
+    
+    TITLE = "My App"
+    CSS = """
+    Screen {
+        layout: vertical;
+    }
+    """
+    
+    BINDINGS = [
+        ("q", "quit", "Quit"),
+        ("?", "help", "Help"),
+    ]
+    
+    def compose(self) -> ComposeResult:
+        """Compose the application UI."""
+        yield Header()
+        yield MainContent()
+        yield Footer()
+```
+
+### 2. Widget Composition
+
+```python
+from textual.containers import Container, Vertical, Horizontal
+from textual.widget import Widget
+from textual.reactive import reactive
+
+class MyWidget(Widget):
+    """Custom widget with reactive state.
+    
+    Follows the compose pattern for declarative UI building.
+    """
+    
+    count: reactive[int] = reactive(0)
+    
+    DEFAULT_CSS = """
+    MyWidget {
+        border: solid $primary;
+        padding: 1;
+    }
+    """
+    
+    def compose(self) -> ComposeResult:
+        """Build widget hierarchy."""
+        yield Label(f"Count: {self.count}")
+        yield Button("Increment")
+    
+    def watch_count(self, new_count: int) -> None:
+        """React to count changes."""
+        if self.is_mounted:
+            self.query_one(Label).update(f"Count: {new_count}")
+```
+
+### 3. Message-Based Communication
+
+```python
+from textual.message import Message
+
+class DataUpdated(Message):
+    """Posted when data is updated."""
+    
+    def __init__(self, data: Any) -> None:
+        self.data = data
+        super().__init__()
+
+class ParentWidget(Widget):
+    def on_data_updated(self, message: DataUpdated) -> None:
+        """Handle data update messages."""
+        self.process_data(message.data)
+```
+
+### 4. Async Data Collection
+
+```python
+from textual import work
+
+class DataPane(Widget):
+    data: reactive[Optional[MyData]] = reactive(None)
+    
+    def on_mount(self) -> None:
+        """Start data collection when mounted."""
+        self.refresh_data()
+    
+    @work(exclusive=True)
+    async def refresh_data(self) -> None:
+        """Collect data asynchronously.
+        
+        Uses @work decorator for background tasks.
+        exclusive=True ensures only one refresh runs at a time.
+        """
+        try:
+            new_data = await collect_data()
+            self.data = new_data
+        except Exception as e:
+            self.notify(f"Error: {e}", severity="error")
+        finally:
+            # Schedule next refresh
+            self.set_timer(1.0, self.refresh_data)
+```
+
+## 📐 Architecture Patterns (ink)
+
+### 1. Application Structure
+
+```typescript
+import React from 'react';
+import {render, Box, Text} from 'ink';
+
+const App = () => {
+  return (
+    <Box flexDirection="column">
+      <Header />
+      <MainContent />
+      <Footer />
+    </Box>
+  );
+};
+
+render(<App />);
+```
+
+### 2. Component Composition
+
+```typescript
+import React, {useState, useEffect} from 'react';
+import {Box, Text} from 'ink';
+
+interface MyWidgetProps {
+  title: string;
+}
+
+const MyWidget: React.FC<MyWidgetProps> = ({title}) => {
+  const [count, setCount] = useState(0);
+  
+  // Equivalent to Textual's on_mount
+  useEffect(() => {
+    const timer = setInterval(() => {
+      setCount(c => c + 1);
+    }, 1000);
+    
+    return () => clearInterval(timer);
+  }, []);
+  
+  return (
+    <Box borderStyle="round" flexDirection="column">
+      <Text bold>{title}</Text>
+      <Text>Count: {count}</Text>
+    </Box>
+  );
+};
+```
+
+### 3. Input Handling
+
+```typescript
+import {useInput} from 'ink';
+
+const InteractiveWidget = () => {
+  useInput((input, key) => {
+    if (key.escape) {
+      process.exit(0);
+    }
+    
+    if (key.upArrow) {
+      // Handle up arrow
+    }
+  });
+  
+  return <Text>Press ESC to quit</Text>;
+};
+```
+
+## 🎨 UI Design Patterns
+
+### 1. Pane Container Pattern (from uptop)
+
+**Purpose**: Reusable container for content panes with title, status, and error handling
+
+```python
+class PaneState(str, Enum):
+    NORMAL = "normal"
+    LOADING = "loading"
+    ERROR = "error"
+    STALE = "stale"
+
+class PaneContainer(Container):
+    """Container widget wrapping pane content.
+    
+    Provides:
+    - Title bar with status indicators
+    - Loading spinner
+    - Error display
+    - Stale data warning
+    """
+    
+    state: reactive[PaneState] = reactive(PaneState.NORMAL)
+    title: reactive[str] = reactive("Untitled")
+    
+    def compose(self) -> ComposeResult:
+        yield PaneTitleBar(self.title, self.state)
+        with VerticalScroll():
+            yield self.content_widget
+```
+
+### 2. High-Resolution Progress Bars
+
+```python
+# Use partial block characters for smooth progress
+PROGRESS_CHARS = " ▏▎▍▌▋▊▉█"
+
+def render_hires_bar(percent: float, width: int) -> str:
+    """8 sub-character levels of precision."""
+    total_eighths = width * 8
+    filled_eighths = int((percent / 100.0) * total_eighths)
+    
+    full_blocks = filled_eighths // 8
+    partial_eighths = filled_eighths % 8
+    
+    bar = "█" * full_blocks
+    if partial_eighths > 0 and full_blocks < width:
+        bar += PROGRESS_CHARS[partial_eighths]
+    
+    return bar.ljust(width)
+```
+
+### 3. Color-Coded Status
+
+```python
+def get_usage_color(percent: float) -> str:
+    """Color based on thresholds."""
+    if percent < 50:
+        return "green"
+    elif percent < 80:
+        return "yellow"
+    else:
+        return "red"
+
+class ColoredBar(Static):
+    percent: reactive[float] = reactive(0.0)
+    
+    def render(self) -> RenderableType:
+        bar = render_hires_bar(self.percent, self.size.width)
+        return Text(bar, style=get_usage_color(self.percent))
+```
+
+### 4. Sparklines for History
+
+```python
+class Sparkline(Widget):
+    """Mini line graph showing trend."""
+    
+    data: reactive[deque[float]] = reactive(deque)
+    max_points: int = 50
+    
+    def render(self) -> RenderableType:
+        if not self.data:
+            return ""
+        
+        # Normalize to 0-1 range
+        min_val = min(self.data)
+        max_val = max(self.data)
+        range_val = max_val - min_val or 1
+        
+        normalized = [
+            (val - min_val) / range_val
+            for val in self.data
+        ]
+        
+        # Use spark characters: ▁▂▃▄▅▆▇█
+        spark_chars = "▁▂▃▄▅▆▇█"
+        return "".join(
+            spark_chars[min(int(v * 8), 7)]
+            for v in normalized
+        )
+```
+
+## 🔧 Best Practices
+
+### 1. Reactive State Management
+
+! Use reactive state primitives (Textual's `reactive`, ink's `useState`):
+
+```python
+# ✅ GOOD: Use reactive attributes
+class MyWidget(Widget):
+    count: reactive[int] = reactive(0)
+    
+    def watch_count(self, new_count: int) -> None:
+        """Automatically called when count changes."""
+        self.refresh()
+
+# ❌ BAD: Manual state tracking - ⊗ do this
+class MyWidget(Widget):
+    def __init__(self):
+        self._count = 0
+    
+    def update_count(self, new_count: int):
+        self._count = new_count
+        self.refresh()  # Easy to forget!
+```
+
+### 2. CSS Styling
+
+~ Use CSS (Textual) for layout and styling rather than inline styles:
+
+```python
+# ✅ GOOD: Use CSS for layout and styling
+DEFAULT_CSS = """
+MyWidget {
+    width: 100%;
+    height: 1fr;
+    border: solid $primary;
+    padding: 1 2;
+}
+
+MyWidget .title {
+    text-style: bold;
+    color: $accent;
+}
+"""
+
+# ❌ BAD: Hardcoded styling in render methods (avoid for complex styling)
+def render(self):
+    return Text("Title", style="bold cyan")
+```
+
+### 3. Async Best Practices
+
+⊗ Block the UI thread - use async operations for I/O and long-running tasks:
+
+```python
+# ✅ GOOD: Use @work for background tasks
+@work(exclusive=True, thread=False)
+async def fetch_data(self) -> None:
+    data = await async_api_call()
+    self.data = data
+
+# ❌ BAD: Blocking calls in main thread - ⊗ do this
+def fetch_data(self) -> None:
+    data = blocking_api_call()  # Freezes UI!
+    self.data = data
+```
+
+### 4. Performance
+
+! Use bounded collections for history/metrics to prevent memory leaks:
+
+```python
+# ✅ GOOD: Efficient updates with dirty checking
+def watch_data(self, new_data: MyData) -> None:
+    if new_data != self._last_data:
+        self._last_data = new_data
+        self.refresh()
+
+# ✅ GOOD: Use ring buffers for history - ! do this
+from collections import deque
+
+self.history = deque(maxlen=100)  # Auto-evicts old data
+
+# ❌ BAD: Unbounded lists - ⊗ do this
+self.history = []
+self.history.append(data)  # Memory leak!
+```
+
+### 5. Error Handling
+
+! Display errors in UI (not just logs) with clear error states:
+
+```python
+class DataPane(Widget):
+    state: reactive[PaneState] = reactive(PaneState.NORMAL)
+    error_message: reactive[str] = reactive("")
+    
+    @work
+    async def collect_data(self) -> None:
+        self.state = PaneState.LOADING
+        try:
+            data = await fetch_data()
+            self.data = data
+            self.state = PaneState.NORMAL
+        except Exception as e:
+            self.error_message = str(e)
+            self.state = PaneState.ERROR  # ! show error in UI
+            self.log.error(f"Data collection failed: {e}")
+```
+
+## Testing
+
+See [testing.md](./testing.md) for universal requirements. Both Textual and ink provide testing utilities.
+
+### Textual Testing
+
+```python
+from textual.pilot import Pilot
+
+async def test_widget_interaction():
+    """Test widget behavior."""
+    async with MyApp().run_test() as pilot:
+        # Simulate key presses
+        await pilot.press("j")  # Down
+        await pilot.press("enter")  # Select
+        
+        # Check state
+        widget = pilot.app.query_one(MyWidget)
+        assert widget.selected_item == 1
+```
+
+### ink Testing
+
+```typescript
+import {render} from 'ink-testing-library';
+
+test('widget renders correctly', () => {
+  const {lastFrame} = render(<MyWidget />);
+  expect(lastFrame()).toContain('Expected text');
+});
+```
+
+## 📝 Layout Patterns
+
+### Grid Layout (Textual)
+
+```python
+class GridLayout(Container):
+    """Responsive grid layout."""
+    
+    DEFAULT_CSS = """
+    GridLayout {
+        layout: grid;
+        grid-size: 2 2;
+        grid-gutter: 1;
+    }
+    """
+    
+    def compose(self) -> ComposeResult:
+        yield PaneContainer(CPUWidget(), title="CPU")
+        yield PaneContainer(MemoryWidget(), title="Memory")
+        yield PaneContainer(NetworkWidget(), title="Network")
+        yield PaneContainer(DiskWidget(), title="Disk")
+```
+
+### Flexbox Layout (ink)
+
+```typescript
+<Box flexDirection="row" gap={1}>
+  <Box flexGrow={1}>
+    <CPUWidget />
+  </Box>
+  <Box flexGrow={1}>
+    <MemoryWidget />
+  </Box>
+</Box>
+```
+
+## 🚨 Common Pitfalls
+
+### 1. Blocking Operations
+
+⊗ Block the UI thread with synchronous I/O:
+
+```python
+# ❌ BAD: Blocking in render - ⊗ do this
+def render(self):
+    data = requests.get("https://api.example.com")  # BLOCKS!
+    return Text(data.text)
+
+# ✅ GOOD: Async data collection
+@work
+async def fetch_data(self):
+    async with httpx.AsyncClient() as client:
+        response = await client.get("https://api.example.com")
+        self.data = response.text
+```
+
+### 2. Memory Leaks
+
+! Use bounded collections to prevent memory leaks:
+
+```python
+# ❌ BAD: Unbounded history - ⊗ do this
+def update_metrics(self, value: float):
+    self.history.append(value)  # Grows forever!
+
+# ✅ GOOD: Ring buffer - ! use bounded collections
+from collections import deque
+
+self.history = deque(maxlen=100)
+self.history.append(value)  # Auto-evicts
+```
+
+### 3. Widget Lifecycle
+
+! Respect widget lifecycle - access DOM only after mounting:
+
+```python
+# ❌ BAD: Access before mount - ⊗ do this
+def __init__(self):
+    super().__init__()
+    label = self.query_one(Label)  # Not mounted yet!
+
+# ✅ GOOD: Use on_mount
+def on_mount(self) -> None:
+    label = self.query_one(Label)
+    label.update("Ready")
+```
+
+## 💡 Advanced Patterns
+
+### 1. Plugin Architecture
+
+```python
+class PanePlugin(Protocol):
+    """Interface for pane plugins."""
+    
+    name: str
+    display_name: str
+    default_refresh_interval: float
+    
+    async def collect_data(self) -> BaseModel:
+        """Collect pane data."""
+        ...
+    
+    def render_tui(self, data: BaseModel) -> Widget:
+        """Render TUI widget."""
+        ...
+```
+
+### 2. Dual Mode (CLI + TUI)
+
+```python
+def main():
+    """Entry point supporting both CLI and TUI modes."""
+    if sys.stdout.isatty() and not format_flags:
+        # Interactive TUI mode
+        app = MyApp()
+        app.run()
+    else:
+        # CLI output mode
+        data = collect_data()
+        print(format_output(data, args.format))
+```
+
+### 3. Theme System
+
+```python
+# Custom theme in CSS
+DARK_THEME = """
+Screen {
+    background: #1e1e1e;
+}
+
+.primary {
+    background: #007acc;
+}
+
+.error {
+    color: #f48771;
+}
+"""
+
+app.theme = DARK_THEME
+```
+
+## 📚 Resources
+
+### Textual
+- [Official Documentation](https://textual.textualize.io/)
+- [Textual Examples](https://github.com/Textualize/textual/tree/main/examples)
+- [Widget Gallery](https://textual.textualize.io/widget_gallery/)
+
+### ink
+- [Official Documentation](https://term.ink/)
+- [ink Components](https://github.com/vadimdemedes/ink#built-in-components)
+- [Community Components](https://github.com/vadimdemedes/awesome-ink)
+
+## 🔗 Related Guidelines
+
+- [cli.md](./cli.md) - CLI best practices and dual-mode patterns
+- [python.md](./python.md) - Python-specific conventions
+- [typescript.md](./typescript.md) - TypeScript patterns

@@ -1,0 +1,67 @@
+version: '3'
+
+tasks:
+  default:
+    desc: List all tasks
+    cmds:
+      - task --list
+    silent: true
+
+  build:
+    desc: Build the library
+    cmds:
+      - go build ./fizzy
+
+  test:
+    desc: Run all tests
+    cmds:
+      - go test -v ./fizzy/...
+
+  test:coverage:
+    desc: Run tests with coverage report (≥85% required)
+    cmds:
+      - go test -v -coverprofile=coverage.out ./fizzy/...
+      - go tool cover -func=coverage.out
+      - |
+        coverage=$(go tool cover -func=coverage.out | grep total | awk '{print $3}' | sed 's/%//')
+        if (( $(echo "$coverage < 85" | bc -l) )); then
+          echo "Coverage $coverage% is below 85% threshold"
+          exit 1
+        fi
+        echo "Coverage $coverage% meets threshold"
+
+  fmt:
+    desc: Format code
+    cmds:
+      - go fmt ./...
+
+  lint:
+    desc: Run go vet
+    cmds:
+      - go vet ./fizzy/...
+
+  quality:
+    desc: Run all quality checks
+    cmds:
+      - task: fmt
+      - task: lint
+
+  check:
+    desc: Pre-commit checks (fmt + lint + test)
+    cmds:
+      - task: fmt
+      - task: lint
+      - task: test
+      - echo "✓ All checks passed"
+
+  deps:
+    desc: Download dependencies
+    cmds:
+      - go mod download
+      - go mod tidy
+
+  clean:
+    desc: Clean build artifacts
+    cmds:
+      - rm -f coverage.out
+      - go clean

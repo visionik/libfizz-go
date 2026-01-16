@@ -1,0 +1,376 @@
+# CLI Best Practices
+
+Legend (from RFC2119): !=MUST, ~=SHOULD, ≉=SHOULD NOT, ⊗=MUST NOT
+
+**⚠️ See also**: [main.md](./main.md) | [typescript.md](./typescript.md) | [python.md](./python.md)
+
+## 🎯 Framework Selection
+
+### Python CLIs
+! Use Typer (except existing Click codebases with plugins, or simple scripts with argparse)
+- Type-safe with Python type hints
+- Automatic help generation from docstrings
+- Rich formatting support out of the box
+- Better IDE support and less boilerplate
+
+```python
+import typer
+
+app = typer.Typer(
+    help="Tool description for main --help",
+    context_settings={"help_option_names": ["-h", "--help"]},
+)
+
+@app.command()
+def mycommand(
+    arg: str = typer.Argument(..., help="Description"),
+    flag: bool = typer.Option(False, "--flag", help="Flag description"),
+) -> None:
+    """Command description shown in help."""
+    pass
+```
+
+### TypeScript/Node.js CLIs
+! Use commander (except existing codebases with other frameworks, or simple scripts)
+- Robust, mature, widely adopted
+- Good TypeScript support
+- Clean API with validation
+
+**Alternatives**:
+- Existing codebases may use `yargs` or other established libraries
+- Simple scripts may use minimalist parsers (minimist, arg)
+- ⊗ Use `readline` for complex CLIs (use dedicated TUI libraries instead)
+
+## Output Formats
+
+~ Support multiple output formats for data-oriented CLIs (APIs, metrics, logs)
+! Enforce mutual exclusivity if multiple format flags are provided
+
+### Standard Format Options
+
+```typescript
+enum OutputFormat {
+  JSON = "json",        // Machine-readable, best for piping/LLMs
+  TREE = "tree",        // Human-readable tree structure (default)
+  MARKDOWN = "markdown", // Markdown tables/lists
+  HTML = "html",        // Interactive visualizations
+  DATAFRAME = "dataframe", // Tabular format
+  PROMETHEUS = "prometheus" // Metrics format
+}
+```
+
+### Format Selection Pattern
+
+```typescript
+// Use flags, not a --format option
+typer.Option(False, "--json", help="Output as JSON"),
+typer.Option(False, "--tree", help="Output as tree (default)"),
+typer.Option(False, "--markdown", help="Output as markdown"),
+
+// ! validate only one format flag
+function get_output_format(json_flag, tree_flag, ...) {
+  if (multiple flags active) {
+    throw error  // ! reject multiple format flags
+  }
+  return active_flag || "default_format"
+}
+```
+
+## 🎯 Best Practices
+
+### Command Design
+
+#### 1. Use Typer Framework
+```typescript
+// TypeScript equivalent pattern
+import typer from 'typer';
+
+const app = typer.Typer({
+  help: "Tool description",
+  no_args_is_help: false,
+  add_completion: true,
+});
+```
+
+#### 2. Command Structure
+- One command = one clear action
+- Use subcommands for related actions
+- Keep command names short and clear
+- Use consistent naming patterns
+
+#### 3. Format Flags Pattern
+```python
+# Standard format flags (Python example)
+json_flag: bool = typer.Option(False, "--json")
+tree_flag: bool = typer.Option(False, "--tree")
+markdown_flag: bool = typer.Option(False, "--markdown")
+
+# Helper to resolve format
+def get_output_format(...) -> str:
+    # Enforce single format selection
+    # Return default if none specified
+```
+
+#### 4. LLM-Friendly Help
+```python
+# ~ add --ai-help flag for detailed LLM guidance
+@app.callback()
+def main_callback(
+    ai_help: bool = typer.Option(
+        False,
+        "--ai-help",
+        callback=ai_help_callback,
+        is_eager=True,
+        help="Show comprehensive guide for LLMs/agents"
+    )
+):
+    pass
+```
+
+## 📐 Architecture Patterns
+
+### 1. Separation of Concerns
+~ Separate CLI parsing, business logic, and output formatting:
+```
+cli.py          # Command definitions, argument parsing
+client.py       # API/business logic
+formatters.py   # Output formatting
+```
+
+### 2. Command Execution Pattern
+```python
+def execute_data_command(
+    date_range: str,
+    fetch_func: Callable,
+    output_format: str,
+) -> None:
+    """Standard command execution pattern."""
+    client = Client()
+    data = fetch_func(client, ...)
+    output = format_output(data, output_format)
+    typer.echo(output)
+```
+
+### 3. Enums for Options
+```python
+class OutputFormat(str, Enum):
+    JSON = "json"
+    MARKDOWN = "markdown"
+    TREE = "tree"
+```
+
+### 4. Validation Before Execution
+```python
+# ! validate format flags
+if len(active_flags) > 1:
+    raise typer.BadParameter("Only one format flag allowed")
+
+# Validate plugin compatibility
+uptop --check-plugins
+```
+
+## 🎨 UX Best Practices
+
+### 1. Sensible Defaults
+- ~ Default to human-readable output format (tree, table)
+- ~ Provide `--json` for machine-readable output
+- ~ Show help (not error) when no args provided
+
+### 2. Multiple Output Formats
+```bash
+tool command today              # Default format
+tool command today --json       # For scripts/LLMs
+tool command today --markdown   # For documentation
+tool command today --html       # For visualization
+```
+
+### 3. Flexible Input Parsing
+```bash
+# Support natural language inputs
+tool command today
+tool command yesterday
+tool command "7 days"
+tool command "2025-01-01 30 days"
+```
+
+### 4. Help System Layers
+1. ! Provide `--help` / `-h` - Standard help with clear descriptions
+2. ~ Provide `--ai-help` - Detailed LLM guide with examples
+3. ! Provide rich error messages with actionable suggestions
+
+### 5. Version Information
+```python
+def version_callback(value: bool) -> None:
+    if value:
+        console.print(f"tool version {__version__}")
+        raise typer.Exit()
+```
+
+## 🔧 Technical Patterns
+
+### 1. Configuration Hierarchy
+```
+1. Command-line flags (highest priority)
+2. Environment variables
+3. Config file (~/.config/tool/config.yaml)
+4. Built-in defaults (lowest priority)
+```
+
+### 2. Error Handling
+```python
+# ! provide clear, actionable error messages
+raise typer.BadParameter(
+    "Only one format flag can be specified: "
+    "--json, --tree, or --markdown"
+)
+```
+
+### 3. Plugin Architecture (uptop pattern)
+```python
+# Entry point discovery
+entry_points(group='tool.plugins')
+
+# Validation before use
+uptop --check-plugins
+
+# Plugin interface
+class Plugin(Protocol):
+    api_version: str
+    version: str
+    def execute(...) -> Result
+```
+
+### 3. Rich Output
+~ Use Rich (Python) or chalk/colors (TypeScript) for formatted output:
+```python
+from rich.console import Console
+
+console = Console()
+console.print("[bold]Important[/bold] message")
+```
+
+## 📝 Documentation Standards
+
+### 1. Module Docstrings
+! Document all CLI modules with clear descriptions and usage:
+```python
+"""Module description.
+
+This module provides:
+- Feature 1
+- Feature 2
+
+Usage:
+    tool command args
+"""
+```
+
+### 2. Command Docstrings
+! Document all commands with descriptions and examples:
+```python
+@app.command()
+def command(arg: str) -> None:
+    """Short description.
+    
+    Longer explanation if needed.
+    
+    Examples:
+        tool command value
+    """
+```
+
+### 3. README Structure
+- Quick start (installation, basic usage)
+- Available commands with examples
+- Configuration instructions
+- Development setup
+- License
+
+## 🚨 Common Pitfalls
+
+### 1. Date/Time Handling
+- ❌ Don't assume user timezone
+- ✅ Accept flexible formats
+- ✅ Document timezone behavior clearly
+
+### 2. Format Flags
+- ❌ Don't allow multiple format flags
+- ✅ Enforce mutual exclusivity
+- ✅ Provide clear default
+
+### 3. Authentication
+- ❌ ⊗ Hardcode credentials
+- ✅ ! Use environment variables or secure credential stores
+- ✅ ~ Support multiple auth methods
+- ✅ ! Provide clear error when auth fails
+
+### 4. Output to Terminal
+- ❌ Don't buffer large outputs
+- ✅ Stream when possible
+- ✅ Consider pagination for large results
+
+## 🎯 Testing
+
+### 1. CLI Testing Pattern
+```python
+from typer.testing import CliRunner
+
+def test_command():
+    runner = CliRunner()
+    result = runner.invoke(app, ["command", "arg"])
+    assert result.exit_code == 0
+```
+
+### 2. Coverage Requirements
+- ! Achieve ≥85% overall coverage
+- ! Test all command paths
+- ! Test format options
+- ! Test error conditions
+
+### 3. Snapshot Testing
+```python
+# For output formats (HTML, markdown, etc.)
+def test_output_format_snapshot():
+    result = format_output(data, "html")
+    assert_matches_snapshot(result)
+```
+
+## 💡 Advanced Features
+
+### 1. Dual Mode (uptop pattern)
+```python
+# Auto-detect TUI vs CLI mode
+if sys.stdout.isatty() and not format_flags:
+    run_tui()
+else:
+    run_cli()
+```
+
+### 2. Streaming Output
+```python
+# For continuous data
+tool monitor --stream --interval 5
+```
+
+### 3. Shell Completion
+~ Provide shell completion (Typer/commander support this automatically):
+```bash
+# Enable completion
+tool --install-completion
+
+# Typer provides this automatically
+```
+
+## 📚 References
+
+- [Typer Documentation](https://typer.tiangolo.com/)
+- [Rich Documentation](https://rich.readthedocs.io/)
+- [Click Documentation](https://click.palletsprojects.com/)
+- [Conventional Commits](https://www.conventionalcommits.org/)
+
+## 🔗 Related Guidelines
+
+- [main.md](./main.md) - General project guidelines
+- [python.md](./python.md) - Python-specific patterns
+- [taskfile.md](./taskfile.md) - Task automation
+- [typescript.md](./typescript.md) - TypeScript patterns

@@ -1,0 +1,53 @@
+# Taskfile Guidelines
+
+Legend (from RFC2119): !=MUST, ~=SHOULD, ≉=SHOULD NOT, ⊗=MUST NOT
+
+**⚠️ See also**: [main.md](./main.md) | [taskfile-migration.md](./taskfile-migration.md)
+
+## Task-Centric Workflow
+
+Repeatable tasks **MUST** use `task` targets. **MUST** add new tasks instead of shell scripts.
+
+```bash
+task --list  # See all tasks
+```
+
+## Core Principles
+
+- **Entrypoint**: Task **SHOULD** be single entry for common flows (`task dev`, `task test`, `task build`)
+- **Composable**: Tasks **SHOULD** be small; **SHOULD** move logic to scripts, Task orchestrates
+- **Default**: **MUST** define default task that lists available tasks
+- **Split**: Large setups **SHOULD** use included Taskfiles (`Taskfile.dev.yml`, `Taskfile.ci.yml`)
+
+## Naming Conventions
+
+**Single-language projects:**
+- **MUST** use generic names: `fmt`, `lint`, `test`, `build`
+
+**Multi-language projects:**
+- **MUST** use namespaced names: `py:fmt`, `go:fmt`, `cpp:fmt`, `ts:fmt`
+- **MUST** provide generic aliases that delegate to all languages:
+  ```yaml
+  fmt:
+    deps: [py:fmt, go:fmt]
+  lint:
+    deps: [py:lint, go:lint]
+  ```
+
+## Dependencies & Performance
+
+- **deps**: **SHOULD** use `deps` for task ordering/reuse
+- **Caching**: **SHOULD** use `sources`/`generates` + `method: checksum` for incremental builds
+- **Idempotent**: **SHOULD** use `status`/`preconditions` to skip completed steps
+
+## Robustness
+
+- **Shell options**: **MUST** use `set: [errexit, nounset, pipefail]` to exit on errors, undefined variables, and pipe failures
+- **Validation**: **SHOULD** use `requires: vars: [VAR]` to fail early on missing variables
+- **Cleanup**: **SHOULD** use `defer` for cleanup even on failure
+
+## UX
+
+- **desc**: **MUST** add `desc` for all user-facing tasks; **SHOULD** use `internal: true` for helper tasks
+- **Templates**: **SHOULD** use `vars`, `env`, `{{.CLI_ARGS}}`, `{{.USER_WORKING_DIR}}` for flexibility
+- **Artifacts**: **SHOULD** keep ephemeral artifacts in temp dir via `TASK_TEMP_DIR`
