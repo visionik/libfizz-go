@@ -24,7 +24,7 @@ import (
 //		fmt.Printf("Card: %s\n", card.Title)
 //	}
 func (s *CardsService) List(ctx context.Context, opts *CardListOptions) (*PagedResult[Card], error) {
-	path := fmt.Sprintf("/%s/cards", s.client.accountSlug)
+	path := fmt.Sprintf("/%s/cards.json", s.client.accountSlug)
 
 	// Build query parameters
 	if opts != nil {
@@ -85,7 +85,7 @@ func (s *CardsService) ListAll(ctx context.Context, opts *CardListOptions) ([]Ca
 //
 //	card, err := client.Cards.Get(ctx, "card-123")
 func (s *CardsService) Get(ctx context.Context, cardID string) (*Card, error) {
-	path := fmt.Sprintf("/%s/cards/%s", s.client.accountSlug, cardID)
+	path := fmt.Sprintf("/%s/cards/%s.json", s.client.accountSlug, cardID)
 
 	var card Card
 	if err := s.client.doRequest(ctx, "GET", path, nil, &card); err != nil {

@@ -91,9 +91,8 @@ func TestBoardsService_GetNotFound(t *testing.T) {
 // Test update methods
 func TestBoardsService_UpdateName(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		assert.Equal(t, "/test-account/boards/123", r.URL.Path)
-		
 		if r.Method == "PATCH" {
+			assert.Equal(t, "/test-account/boards/123", r.URL.Path)
 			// Verify wrapped request body
 			var payload map[string]interface{}
 			json.NewDecoder(r.Body).Decode(&payload)
@@ -106,6 +105,7 @@ func TestBoardsService_UpdateName(t *testing.T) {
 			w.WriteHeader(http.StatusNoContent)
 		} else if r.Method == "GET" {
 			// Follow-up GET after 204
+			assert.Equal(t, "/test-account/boards/123.json", r.URL.Path)
 			w.WriteHeader(http.StatusOK)
 			json.NewEncoder(w).Encode(Board{ID: "123", Name: "Updated Name"})
 		}

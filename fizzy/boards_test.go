@@ -45,7 +45,7 @@ func TestBoardsService_List(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-				assert.Equal(t, "/test-account/boards", r.URL.Path)
+				assert.Equal(t, "/test-account/boards.json", r.URL.Path)
 				assert.Equal(t, "GET", r.Method)
 				assert.Equal(t, "Bearer test-token", r.Header.Get("Authorization"))
 
@@ -75,7 +75,7 @@ func TestBoardsService_List(t *testing.T) {
 
 func TestBoardsService_Get(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		assert.Equal(t, "/test-account/boards/board-123", r.URL.Path)
+		assert.Equal(t, "/test-account/boards/board-123.json", r.URL.Path)
 		w.WriteHeader(http.StatusOK)
 		w.Write([]byte(`{"id":"board-123","name":"Engineering","description":"Dev tasks"}`))
 	}))
@@ -104,10 +104,10 @@ func TestBoardsService_Create(t *testing.T) {
 			board := payload["board"].(map[string]interface{})
 			assert.Equal(t, "New Board", board["name"])
 			
-			// Return 201 with Location header
-			w.Header().Set("Location", "/test-account/boards/new-board")
+			// Return 201 with board data
 			w.WriteHeader(http.StatusCreated)
-		} else if r.URL.Path == "/test-account/boards/new-board" {
+			w.Write([]byte(`{"id":"new-board","name":"New Board"}`))
+		} else if r.URL.Path == "/test-account/boards/new-board.json" {
 			// Follow-up GET request
 			assert.Equal(t, "GET", r.Method)
 			w.WriteHeader(http.StatusOK)
@@ -143,7 +143,7 @@ func TestBoardsService_Update(t *testing.T) {
 			w.WriteHeader(http.StatusNoContent)
 		} else if r.Method == "GET" {
 			// Follow-up GET request after 204
-			assert.Equal(t, "/test-account/boards/board-123", r.URL.Path)
+			assert.Equal(t, "/test-account/boards/board-123.json", r.URL.Path)
 			w.WriteHeader(http.StatusOK)
 			w.Write([]byte(`{"id":"board-123","name":"Updated Name"}`))
 		}

@@ -38,7 +38,7 @@ func TestCardsService_List(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-				assert.Equal(t, "/test-account/cards", r.URL.Path)
+				assert.Equal(t, "/test-account/cards.json", r.URL.Path)
 				assert.Equal(t, "GET", r.Method)
 				w.WriteHeader(tt.statusCode)
 				json.NewEncoder(w).Encode(tt.response)
@@ -63,7 +63,7 @@ func TestCardsService_List(t *testing.T) {
 
 func TestCardsService_Get(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		assert.Equal(t, "/test-account/cards/123", r.URL.Path)
+		assert.Equal(t, "/test-account/cards/123.json", r.URL.Path)
 		assert.Equal(t, "GET", r.Method)
 		json.NewEncoder(w).Encode(Card{ID: "123", Title: "Test Card"})
 	}))

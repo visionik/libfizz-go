@@ -17,7 +17,7 @@ import (
 //		fmt.Printf("Board: %s\n", board.Name)
 //	}
 func (s *BoardsService) List(ctx context.Context) ([]Board, error) {
-	path := fmt.Sprintf("/%s/boards", s.client.accountSlug)
+	path := fmt.Sprintf("/%s/boards.json", s.client.accountSlug)
 
 	var boards []Board
 	if err := s.client.doRequest(ctx, "GET", path, nil, &boards); err != nil {
@@ -37,7 +37,7 @@ func (s *BoardsService) List(ctx context.Context) ([]Board, error) {
 //	}
 //	fmt.Printf("Board: %s\n", board.Name)
 func (s *BoardsService) Get(ctx context.Context, boardID string) (*Board, error) {
-	path := fmt.Sprintf("/%s/boards/%s", s.client.accountSlug, boardID)
+	path := fmt.Sprintf("/%s/boards/%s.json", s.client.accountSlug, boardID)
 
 	var board Board
 	if err := s.client.doRequest(ctx, "GET", path, nil, &board); err != nil {

@@ -33,9 +33,12 @@ type Board struct {
 	ID          string    `json:"id"`
 	Name        string    `json:"name"`
 	Description *string   `json:"description,omitempty"`
+	AllAccess   bool      `json:"all_access,omitempty"`
 	Position    int       `json:"position"`
 	CreatedAt   time.Time `json:"created_at"`
 	UpdatedAt   time.Time `json:"updated_at"`
+	URL         string    `json:"url,omitempty"`
+	Creator     *User     `json:"creator,omitempty"`
 }
 
 // BoardCreateOptions contains options for creating a board.
@@ -53,23 +56,31 @@ type BoardUpdateOptions struct {
 
 // Card represents a Fizzy card.
 type Card struct {
-	ID            string     `json:"id"`
-	Number        int        `json:"number"` // Card number used in URLs
-	BoardID       string     `json:"board_id"`
-	Title         string     `json:"title"`
-	Body          *string    `json:"body,omitempty"`
-	Status        string     `json:"status"` // "open", "closed", "maybe", "not_now"
-	ColumnID      *string    `json:"column_id,omitempty"`
-	Position      int        `json:"position"`
-	Golden        bool       `json:"golden"`
-	CreatedAt     time.Time  `json:"created_at"`
-	UpdatedAt     time.Time  `json:"updated_at"`
-	ClosedAt      *time.Time `json:"closed_at,omitempty"`
-	Creator       *User      `json:"creator,omitempty"`
-	Assignees     []User     `json:"assignees,omitempty"`
-	Tags          []Tag      `json:"tags,omitempty"`
-	URL           string     `json:"url"`
-	CommentsCount int        `json:"comments_count"`
+	ID                 string     `json:"id"`
+	Number             int        `json:"number"` // Card number used in URLs
+	BoardID            string     `json:"board_id,omitempty"`
+	Title              string     `json:"title"`
+	Description        *string    `json:"description,omitempty"`        // Plain text description
+	DescriptionHTML    *string    `json:"description_html,omitempty"`   // HTML formatted description
+	Body               *string    `json:"body,omitempty"`               // Alias for Description (deprecated, use Description)
+	ImageURL           *string    `json:"image_url,omitempty"`          // Attached image URL
+	Status             string     `json:"status"`                        // "published", "closed", "maybe", "not_now"
+	Closed             bool       `json:"closed,omitempty"`             // Whether card is closed
+	ColumnID           *string    `json:"column_id,omitempty"`
+	Position           int        `json:"position"`
+	Golden             bool       `json:"golden"`
+	LastActiveAt       *time.Time `json:"last_active_at,omitempty"`
+	CreatedAt          time.Time  `json:"created_at"`
+	UpdatedAt          time.Time  `json:"updated_at,omitempty"`
+	ClosedAt           *time.Time `json:"closed_at,omitempty"`
+	Board              *Board     `json:"board,omitempty"`              // Full board object
+	Creator            *User      `json:"creator,omitempty"`
+	Assignees          []User     `json:"assignees,omitempty"`
+	HasMoreAssignees   bool       `json:"has_more_assignees,omitempty"`
+	Tags               []Tag      `json:"tags,omitempty"`
+	URL                string     `json:"url"`
+	CommentsURL        string     `json:"comments_url,omitempty"`
+	CommentsCount      int        `json:"comments_count,omitempty"`
 }
 
 // CardCreateOptions contains options for creating a card.
